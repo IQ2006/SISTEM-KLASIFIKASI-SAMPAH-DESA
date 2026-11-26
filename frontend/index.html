@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EcoDesa AI — Sistem Klasifikasi Sampah Rumah Tangga Desa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <header class="bg-emerald-700 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-white text-emerald-700 font-bold rounded-xl w-10 h-10 flex items-center justify-center text-xl shadow">
+          ♻️
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">EcoDesa AI</h1>
+          <p class="text-xs text-emerald-100">Klasifikasi Sampah Rumah Tangga Berbasis CNN untuk Pemilahan di Desa</p>
+        </div>
+      </div>
+
+      <nav class="flex gap-2 bg-emerald-800/70 p-1 rounded-xl text-sm">
+        <button onclick="switchTab('scanner')" id="tab-scanner"
+          class="px-4 py-2 rounded-lg font-medium bg-white text-emerald-800 shadow transition">
+          Deteksi AI
+        </button>
+        <button onclick="switchTab('dashboard')" id="tab-dashboard"
+          class="px-4 py-2 rounded-lg font-medium text-emerald-100 hover:bg-emerald-700 transition">
+          Dasbor Desa
+        </button>
+        <button onclick="switchTab('education')" id="tab-education"
+          class="px-4 py-2 rounded-lg font-medium text-emerald-100 hover:bg-emerald-700 transition">
+          Panduan Pilah
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full">
+
+    <!-- ================= TAB 1: DETEKSI SAMPAH AI ================= -->
+    <section id="view-scanner" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Kolom Kiri: Input Gambar / Kamera -->
+        <div class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-bold text-slate-800 text-base">1. Ambil atau Unggah Foto Sampah</h2>
+            <span class="text-xs bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full font-medium border border-emerald-200">
+              MobileNetV2 CNN
+            </span>
+          </div>
+
+          <!-- Pilih Wilayah Dusun -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Asal Dusun / RT Warga</label>
+            <select id="dusun-select"
+              class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="Dusun Krajan - RW 01">Dusun Krajan - RW 01</option>
+              <option value="Dusun Sukamaju - RW 02">Dusun Sukamaju - RW 02</option>
+              <option value="Dusun Sumberrejo - RW 03">Dusun Sumberrejo - RW 03</option>
+              <option value="Dusun Sidodadi - RW 04">Dusun Sidodadi - RW 04</option>
+            </select>
+          </div>
+
+          <!-- Tombol Pilih Mode Input -->
+          <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl text-sm">
+            <button type="button" onclick="setInputMode('upload')" id="btn-mode-upload"
+              class="py-2 rounded-lg font-semibold bg-white text-slate-800 shadow-sm">
+              📁 Unggah Gambar
+            </button>
+            <button type="button" onclick="setInputMode('camera')" id="btn-mode-camera"
+              class="py-2 rounded-lg font-semibold text-slate-600 hover:text-slate-900">
+              📷 Kamera Langsung
+            </button>
+          </div>
+
+          <!-- Mode Upload -->
+          <div id="box-upload" class="space-y-3">
+            <label for="file-input"
+              class="border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition min-h-[230px]">
+              <img id="preview-img" class="hidden max-h-52 rounded-xl object-contain mb-2 shadow-sm" alt="Pratinjau sampah" />
+              <div id="upload-placeholder" class="space-y-2">
+                <div class="text-4xl">🖼️</div>
+                <p class="text-sm font-semibold text-slate-700">Klik untuk memilih foto sampah</p>
+                <p class="text-xs text-slate-500">Format JPG, PNG, atau WEBP (Maks. 8MB)</p>
+              </div>
+              <input id="file-input" type="file" accept="image/*" class="hidden" onchange="handleFileSelect(event)" />
+            </label>
+          </div>
+
+          <!-- Mode Kamera -->
+          <div id="box-camera" class="hidden space-y-3">
+            <div class="relative bg-black rounded-2xl overflow-hidden min-h-[230px] flex items-center justify-center">
+              <video id="camera-video" autoplay playsinline class="w-full max-h-60 object-cover"></video>
+              <canvas id="camera-canvas" class="hidden"></canvas>
+            </div>
+            <button type="button" onclick="capturePhoto()"
+              class="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm shadow transition">
+              📸 Jepret Foto Sampah
+            </button>
+          </div>
+
+          <!-- Tombol Eksekusi Klasifikasi -->
+          <button id="btn-classify" onclick="submitClassification()" disabled
+            class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow transition flex items-center justify-center gap-2">
+            <span>🔍 Klasifikasikan Sampah Sekarang</span>
+          </button>
+
+          <p id="status-msg" class="text-xs text-center text-slate-500"></p>
+        </div>
+
+        <!-- Kolom Kanan: Hasil Klasifikasi & Panduan Pemilahan -->
+        <div class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div id="result-empty" class="h-full flex flex-col items-center justify-center text-center py-12 text-slate-400">
+            <div class="text-5xl mb-3">🌱</div>
+            <h3 class="font-semibold text-slate-600 text-base">Belum Ada Sampah Dianalisis</h3>
+            <p class="text-sm max-w-md mt-1">
+              Unggah atau foto sampah rumah tangga Anda di panel sebelah kiri untuk mengetahui kategori, cara pemilahan, pengelolaan desa, dan potensi daur ulangnya.
+            </p>
+          </div>
+
+          <div id="result-content" class="hidden space-y-5">
+            <!-- Header Prediksi -->
+            <div class="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span id="res-kategori-badge" class="text-xs font-bold px-3 py-1 rounded-full text-white bg-emerald-600">
+                    Kategori
+                  </span>
+                  <span id="res-tong-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border">
+                    Warna Tong: -
+                  </span>
+                </div>
+                <h2 id="res-nama-jenis" class="text-xl font-extrabold text-slate-900 mt-1">-</h2>
+                <p id="res-model-info" class="text-xs text-slate-500 mt-0.5">Tingkat Keyakinan AI: -</p>
+              </div>
+
+              <!-- Top 3 Probabilitas -->
+              <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 min-w-[200px]">
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Probabilitas Prediksi</p>
+                <div id="res-top-probs" class="space-y-1 text-xs"></div>
+              </div>
+            </div>
+
+            <!-- Grid Informasi Praktis -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-4">
+                <h4 class="font-bold text-emerald-900 text-sm mb-1">✂️ Cara Pemisahan</h4>
+                <p id="res-cara-pemisahan" class="text-xs text-slate-700 leading-relaxed"></p>
+              </div>
+
+              <div class="bg-sky-50/70 border border-sky-200 rounded-xl p-4">
+                <h4 class="font-bold text-sky-900 text-sm mb-1">🏡 Cara Pengelolaan di Desa</h4>
+                <p id="res-cara-pengelolaan" class="text-xs text-slate-700 leading-relaxed"></p>
+              </div>
+
+              <div class="bg-amber-50/70 border border-amber-200 rounded-xl p-4">
+                <h4 class="font-bold text-amber-900 text-sm mb-1">💰 Potensi Daur Ulang & Nilai Ekonomi</h4>
+                <p id="res-potensi" class="text-xs text-slate-700 leading-relaxed"></p>
+                <p id="res-nilai-ekonomis" class="text-xs font-bold text-amber-800 mt-2"></p>
+              </div>
+
+              <div class="bg-purple-50/70 border border-purple-200 rounded-xl p-4">
+                <h4 class="font-bold text-purple-900 text-sm mb-1">✅ Tips Sebelum Dibuang</h4>
+                <ul id="res-tips" class="text-xs text-slate-700 list-disc pl-4 space-y-1"></ul>
+              </div>
+            </div>
+
+            <!-- Edukasi Lingkungan -->
+            <div class="bg-slate-800 text-slate-100 rounded-xl p-4">
+              <h4 class="font-bold text-emerald-400 text-xs uppercase tracking-wider mb-1">💡 Tahukah Warga Desa?</h4>
+              <p id="res-edukasi" class="text-xs leading-relaxed text-slate-200"></p>
+            </div>
+
+            <!-- Panel Validasi Akurasi Lapangan -->
+            <div id="feedback-box" class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-bold text-slate-700">Validasi Kader / Warga (Evaluasi Akurasi AI)</p>
+                <p class="text-[11px] text-slate-500">Apakah hasil klasifikasi sistem sudah sesuai dengan sampah fisik?</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="sendFeedback(true)"
+                  class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg">
+                  👍 Sudah Benar
+                </button>
+                <select id="correction-select" class="border border-slate-300 rounded-lg px-2 py-1.5 text-xs">
+                  <option value="">Koreksi jika salah...</option>
+                  <option value="organik">Organik</option>
+                  <option value="plastik">Plastik</option>
+                  <option value="kertas_kardus">Kertas / Kardus</option>
+                  <option value="kaca">Kaca</option>
+                  <option value="logam">Logam / Kaleng</option>
+                  <option value="residu">Residu</option>
+                </select>
+                <button onclick="sendFeedback(false)"
+                  class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg">
+                  Kirim Koreksi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: DASBOR STATISTIK DESA ================= -->
+    <section id="view-dashboard" class="hidden space-y-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500">Total Sampah Terklasifikasi</p>
+          <p id="stat-total" class="text-3xl font-extrabold text-emerald-700 mt-1">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500">Sampah Tervalidasi Warga</p>
+          <p id="stat-validated" class="text-3xl font-extrabold text-sky-700 mt-1">0</p>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold text-slate-500">Akurasi Validasi Lapangan</p>
+          <p id="stat-accuracy" class="text-3xl font-extrabold text-amber-600 mt-1">-</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 text-sm mb-4">Komposisi Jenis Sampah Rumah Tangga</h3>
+          <canvas id="chart-classes" height="220"></canvas>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 text-sm mb-4">Partisipasi Pemilahan per Dusun</h3>
+          <canvas id="chart-dusun" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Tabel Riwayat -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100">
+          <h3 class="font-bold text-slate-800 text-sm">Riwayat Klasifikasi Terbaru di Desa</h3>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-600 uppercase">
+              <tr>
+                <th class="px-4 py-3">Foto</th>
+                <th class="px-4 py-3">Waktu</th>
+                <th class="px-4 py-3">Wilayah Dusun</th>
+                <th class="px-4 py-3">Hasil AI</th>
+                <th class="px-4 py-3">Confidence</th>
+                <th class="px-4 py-3">Status Validasi</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: KATALOG EDUKASI PEMILAHAN ================= -->
+    <section id="view-education" class="hidden space-y-4">
+      <div class="bg-emerald-800 text-white rounded-2xl p-6">
+        <h2 class="text-xl font-bold">Panduan Pemilahan 6 Jenis Sampah Rumah Tangga Desa</h2>
+        <p class="text-xs text-emerald-100 mt-1">
+          Kenali karakteristik setiap jenis sampah agar mudah dikelola menjadi kompos maupun tabungan Bank Sampah Desa.
+        </p>
+      </div>
+      <div id="education-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </section>
+
+  </main>
+
+  <script>
+    let selectedBlob = null;
+    let selectedFilename = "sampah.jpg";
+    let cameraStream = null;
+    let currentRecordId = null;
+    let currentPredictedClass = null;
+    let classChartInstance = null;
+    let dusunChartInstance = null;
+
+    // Navigasi Tab
+    function switchTab(tabName) {
+      ["scanner", "dashboard", "education"].forEach((t) => {
+        document.getElementById(`view-${t}`).classList.toggle("hidden", t !== tabName);
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tabName) {
+          btn.className = "px-4 py-2 rounded-lg font-medium bg-white text-emerald-800 shadow transition";
+        } else {
+          btn.className = "px-4 py-2 rounded-lg font-medium text-emerald-100 hover:bg-emerald-700 transition";
+        }
+      });
+
+      if (tabName === "dashboard") loadDashboardStats();
+      if (tabName === "education") loadEducationCatalog();
+    }
+
+    // Mode Upload vs Kamera
+    async function setInputMode(mode) {
+      const boxUpload = document.getElementById("box-upload");
+      const boxCamera = document.getElementById("box-camera");
+      const btnUpload = document.getElementById("btn-mode-upload");
+      const btnCamera = document.getElementById("btn-mode-camera");
+
+      if (mode === "camera") {
+        boxUpload.classList.add("hidden");
+        boxCamera.classList.remove("hidden");
+        btnCamera.className = "py-2 rounded-lg font-semibold bg-white text-slate-800 shadow-sm";
+        btnUpload.className = "py-2 rounded-lg font-semibold text-slate-600";
+        try {
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+          });
+          document.getElementById("camera-video").srcObject = cameraStream;
+        } catch (err) {
+          alert("Tidak dapat mengakses kamera perangkat: " + err.message);
+        }
+      } else {
+        stopCamera();
+        boxCamera.classList.add("hidden");
+        boxUpload.classList.remove("hidden");
+        btnUpload.className = "py-2 rounded-lg font-semibold bg-white text-slate-800 shadow-sm";
+        btnCamera.className = "py-2 rounded-lg font-semibold text-slate-600";
+      }
+    }
+
+    function stopCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+      }
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      selectedBlob = file;
+      selectedFilename = file.name;
+
+      const preview = document.getElementById("preview-img");
+      preview.src = URL.createObjectURL(file);
+      preview.classList.remove("hidden");
+      document.getElementById("upload-placeholder").classList.add("hidden");
+      document.getElementById("btn-classify").disabled = false;
+    }
+
+    function capturePhoto() {
+      const video = document.getElementById("camera-video");
+      const canvas = document.getElementById("camera-canvas");
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        selectedBlob = blob;
+        selectedFilename = `kamera-${Date.now()}.jpg`;
+        const preview = document.getElementById("preview-img");
+        preview.src = URL.createObjectURL(blob);
+        preview.classList.remove("hidden");
+        document.getElementById("upload-placeholder").classList.add("hidden");
+        setInputMode("upload");
+        document.getElementById("btn-classify").disabled = false;
+      }, "image/jpeg", 0.9);
+    }
+
+    // Kirim ke Backend Node.js -> Python AI
+    async function submitClassification() {
+      if (!selectedBlob) return;
+      const btn = document.getElementById("btn-classify");
+      const statusMsg = document.getElementById("status-msg");
+      const dusun = document.getElementById("dusun-select").value;
+
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ Menganalisis Citra dengan AI...</span>`;
+      statusMsg.textContent = "Mengirim gambar ke model CNN MobileNetV2...";
+
+      const formData = new FormData();
+      formData.append("image", selectedBlob, selectedFilename);
+      formData.append("dusun", dusun);
+
+      try {
+        const res = await fetch("/api/classify", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (!data.success) throw new Error(data.message);
+
+        currentRecordId = data.record_id;
+        currentPredictedClass = data.ai_result.predicted_class;
+        renderResult(data);
+        statusMsg.textContent = "Klasifikasi berhasil!";
+      } catch (err) {
+        alert("Terjadi kesalahan: " + err.message);
+        statusMsg.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🔍 Klasifikasikan Sampah Sekarang</span>`;
+      }
+    }
+
+    function renderResult(data) {
+      document.getElementById("result-empty").classList.add("hidden");
+      document.getElementById("result-content").classList.remove("hidden");
+
+      const edu = data.education;
+      const ai = data.ai_result;
+
+      const badge = document.getElementById("res-kategori-badge");
+      badge.textContent = edu.kategori;
+      badge.style.backgroundColor = edu.kode_warna;
+
+      document.getElementById("res-tong-badge").textContent = `Tong Sampah: ${edu.warna_tong}`;
+      document.getElementById("res-nama-jenis").textContent = edu.nama_jenis;
+      document.getElementById("res-model-info").textContent =
+        `Keyakinan Model: ${(ai.confidence * 100).toFixed(1)}% • Mode: ${ai.model_mode}`;
+
+      // Top 3 Probabilitas
+      const topContainer = document.getElementById("res-top-probs");
+      topContainer.innerHTML = ai.top_predictions
+        .map(
+          (item) => `
+          <div class="flex justify-between items-center">
+            <span class="capitalize font-medium text-slate-700">${item.class.replace("_", " ")}</span>
+            <span class="font-bold text-emerald-700">${(item.probability * 100).toFixed(1)}%</span>
+          </div>`
+        )
+        .join("");
+
+      document.getElementById("res-cara-pemisahan").textContent = edu.cara_pemisahan;
+      document.getElementById("res-cara-pengelolaan").textContent = edu.cara_pengelolaan;
+      document.getElementById("res-potensi").textContent = edu.potensi_daur_ulang;
+      document.getElementById("res-nilai-ekonomis").textContent = `Estimasi Nilai: ${edu.estimasi_nilai_ekonomis}`;
+      document.getElementById("res-edukasi").textContent = edu.edukasi_singkat;
+
+      const tipsList = document.getElementById("res-tips");
+      tipsList.innerHTML = edu.tips_sebelum_dibuang.map((tip) => `<li>${tip}</li>`).join("");
+    }
+
+    async function sendFeedback(isAccurate) {
+      if (!currentRecordId) return;
+      const correction = document.getElementById("correction-select").value;
+      if (!isAccurate && !correction) {
+        alert("Pilih jenis sampah yang benar pada dropdown koreksi terlebih dahulu.");
+        return;
+      }
+
+      const actualClass = isAccurate ? currentPredictedClass : correction;
+      const res = await fetch(`/api/feedback/${currentRecordId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_accurate: isAccurate, actual_class: actualClass })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message);
+      }
+    }
+
+    async function loadDashboardStats() {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      if (!data.success) return;
+
+      const totalCount = data.by_class.reduce((acc, item) => acc + item.total, 0);
+      const valTotal = data.validation.total_validated || 0;
+      const valAcc = data.validation.accurate_count || 0;
+
+      document.getElementById("stat-total").textContent = totalCount;
+      document.getElementById("stat-validated").textContent = valTotal;
+      document.getElementById("stat-accuracy").textContent =
+        valTotal > 0 ? `${((valAcc / valTotal) * 100).toFixed(1)}%` : "Belum ada data";
+
+      // Chart Komposisi Kelas
+      const ctx1 = document.getElementById("chart-classes").getContext("2d");
+      if (classChartInstance) classChartInstance.destroy();
+      classChartInstance = new Chart(ctx1, {
+        type: "doughnut",
+        data: {
+          labels: data.by_class.map((x) => x.predicted_class.toUpperCase()),
+          datasets: [{
+            data: data.by_class.map((x) => x.total),
+            backgroundColor: ["#16a34a", "#eab308", "#2563eb", "#64748b", "#d97706", "#dc2626"]
+          }]
+        }
+      });
+
+      // Chart per Dusun
+      const ctx2 = document.getElementById("chart-dusun").getContext("2d");
+      if (dusunChartInstance) dusunChartInstance.destroy();
+      dusunChartInstance = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: data.by_dusun.map((x) => x.dusun),
+          datasets: [{
+            label: "Jumlah Sampah Terpilah",
+            data: data.by_dusun.map((x) => x.total),
+            backgroundColor: "#059669",
+            borderRadius: 6
+          }]
+        }
+      });
+
+      // Tabel Riwayat
+      const tbody = document.getElementById("history-tbody");
+      tbody.innerHTML = data.recent_history
+        .map(
+          (row) => `
+          <tr>
+            <td class="px-4 py-2.5"><img src="${row.image_url}" class="w-11 h-11 rounded-lg object-cover border" /></td>
+            <td class="px-4 py-2.5 text-slate-500">${row.created_at}</td>
+            <td class="px-4 py-2.5 font-medium">${row.dusun}</td>
+            <td class="px-4 py-2.5 font-bold uppercase text-emerald-700">${row.predicted_class}</td>
+            <td class="px-4 py-2.5">${(row.confidence * 100).toFixed(1)}%</td>
+            <td class="px-4 py-2.5">
+              ${
+                row.is_accurate === null
+                  ? '<span class="text-slate-400">Menunggu</span>'
+                  : row.is_accurate === 1
+                  ? '<span class="text-emerald-600 font-bold">✔ Akurat</span>'
+                  : `<span class="text-rose-600 font-bold">✘ Koreksi: ${row.user_validated_class}</span>`
+              }
+            </td>
+          </tr>`
+        )
+        .join("");
+    }
+
+    async function loadEducationCatalog() {
+      const res = await fetch("/api/education");
+      const data = await res.json();
+      const grid = document.getElementById("education-grid");
+      grid.innerHTML = data.items
+        .map(
+          (item) => `
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col justify-between space-y-3">
+            <div>
+              <span class="text-[11px] font-bold px-2.5 py-1 rounded-full text-white" style="background:${item.kode_warna}">
+                Tong ${item.warna_tong}
+              </span>
+              <h3 class="font-bold text-slate-900 text-base mt-2">${item.nama_jenis}</h3>
+              <p class="text-xs text-slate-600 mt-2 leading-relaxed">${item.cara_pemisahan}</p>
+            </div>
+            <div class="pt-3 border-t border-slate-100 text-xs">
+              <p class="font-semibold text-emerald-700">Nilai Bank Sampah:</p>
+              <p class="text-slate-600">${item.estimasi_nilai_ekonomis}</p>
+            </div>
+          </div>`
+        )
+        .join("");
+    }
+  </script>
+</body>
+</html>
